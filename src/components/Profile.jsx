@@ -12,7 +12,7 @@ function StatRow({ label, value, sub }) {
   )
 }
 
-export default function ProfileView({ profile, onReset, onUpdate }) {
+export default function ProfileView({ profile, googleUser, onReset, onUpdate, onLogOut }) {
   const goal     = GOAL_LABELS[profile.goal]
   const activity = ACTIVITY_LABELS[profile.activity]
   const bmi      = (profile.weight / ((profile.height / 100) ** 2)).toFixed(1)
@@ -129,6 +129,31 @@ export default function ProfileView({ profile, onReset, onUpdate }) {
         </div>
       </div>
 
+      {/* Google account */}
+      {googleUser && (
+        <div className="glass-card p-5">
+          <h3 className="text-white font-semibold mb-3">Google Account</h3>
+          <div className="flex items-center gap-3 mb-4">
+            {googleUser.photoURL
+              ? <img src={googleUser.photoURL} alt="" className="w-10 h-10 rounded-full object-cover" />
+              : <div className="w-10 h-10 rounded-full bg-violet-600/20 flex items-center justify-center text-violet-400 font-bold">
+                  {googleUser.displayName?.charAt(0) ?? '?'}
+                </div>
+            }
+            <div>
+              <p className="text-white font-medium text-sm">{googleUser.displayName}</p>
+              <p className="text-slate-500 text-xs">{googleUser.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { if (window.confirm('Sign out of FitTrack?')) onLogOut() }}
+            className="w-full py-2.5 rounded-xl border border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-500 font-medium text-sm transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      )}
+
       {/* Reset */}
       <div className="glass-card p-5">
         <h3 className="text-white font-semibold mb-1">Reset Profile</h3>
@@ -141,7 +166,7 @@ export default function ProfileView({ profile, onReset, onUpdate }) {
           }}
           className="w-full py-3 rounded-xl border border-red-900/50 text-red-400 bg-red-900/10 hover:bg-red-900/20 font-semibold text-sm transition-colors"
         >
-          Reset & Redo Onboarding
+          Reset &amp; Redo Onboarding
         </button>
       </div>
     </div>

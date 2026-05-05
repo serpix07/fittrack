@@ -13,11 +13,11 @@ function getWeekDates() {
   })
 }
 
-export default function WorkoutLog({ profile }) {
+export default function WorkoutLog({ profile, userId }) {
   const sports = profile.sports || ['gym']
   const availableTypes = sports.map(id => ({ id, ...SPORT_CONFIG[id] })).filter(Boolean)
 
-  const [sessions, setSessions] = useLocalStorage('ft-workouts', [])
+  const [sessions, setSessions] = useLocalStorage(`ft-${userId}-workouts`, [])
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     type: sports[0] || 'gym',

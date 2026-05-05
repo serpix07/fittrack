@@ -19,7 +19,7 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
-export default function WeightProgress({ profile }) {
+export default function WeightProgress({ profile, userId }) {
   const START   = profile.startWeight
   const GOAL    = profile.goalWeight
   const START_D = profile.startDate
@@ -27,7 +27,7 @@ export default function WeightProgress({ profile }) {
   TARGET_DATE_OBJ.setDate(TARGET_DATE_OBJ.getDate() + 90)
   const TARGET_DATE = TARGET_DATE_OBJ.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
-  const [entries, setEntries] = useLocalStorage('ft-weight', [
+  const [entries, setEntries] = useLocalStorage(`ft-${userId}-weight`, [
     { id: 0, date: START_D, weight: START }
   ])
   const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], weight: '' })

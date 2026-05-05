@@ -38,12 +38,12 @@ function SleepBar({ hours, target }) {
   )
 }
 
-export default function SleepTracker({ profile }) {
+export default function SleepTracker({ profile, userId }) {
   const targetBed  = profile.recommendedBedtime
   const targetWake = profile.wakeTime
   const targetH    = 8
 
-  const [logs, setLogs] = useLocalStorage('ft-sleep', [])
+  const [logs, setLogs] = useLocalStorage(`ft-${userId}-sleep`, [])
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     bed: targetBed,
