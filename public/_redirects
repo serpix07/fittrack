@@ -1,0 +1,21 @@
+# Netlify functions — never rewrite
+/.netlify/functions/*  /.netlify/functions/:splat  200
+
+# Vite hashed assets (all JS/CSS bundles live here)
+/assets/*  /assets/:splat  200
+
+# Root-level static files with extensions — serve directly, never redirect to index.html
+/*.js    /:splat.js    200
+/*.mjs   /:splat.mjs   200
+/*.css   /:splat.css   200
+/*.ico   /:splat.ico   200
+/*.png   /:splat.png   200
+/*.svg   /:splat.svg   200
+/*.webp  /:splat.webp  200
+/*.json  /:splat.json  200
+/*.wasm  /:splat.wasm  200
+/*.txt   /:splat.txt   200
+/*.xml   /:splat.xml   200
+
+# SPA catch-all — only for extensionless paths (actual app routes)
+/*  /index.html  200
