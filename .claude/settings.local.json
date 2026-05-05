@@ -6,7 +6,15 @@
       "Read(//mnt/c/Users/adm.julen/**)",
       "Read(//mnt/c/Users/adm.julen/mi-salud-app/**)",
       "PowerShell(Get-Process *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(nnode_modules/)",
+      "Bash(n# build *)",
+      "Bash(n)",
+      "Bash(n.env.local)",
+      "Bash(n.vscode/)",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
