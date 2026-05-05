@@ -1,4 +1,4 @@
-import { GOAL_LABELS, ACTIVITY_LABELS, SPORT_CONFIG } from '../utils/calculations'
+import { GOAL_LABELS, ACTIVITY_LABELS, SPORT_CONFIG, getActivityLabel } from '../utils/calculations'
 
 function StatRow({ label, value, sub }) {
   return (
@@ -12,10 +12,35 @@ function StatRow({ label, value, sub }) {
   )
 }
 
+function goalBadgeClass(goal) {
+  const cat = GOAL_LABELS[goal]?.category ?? (
+    goal === 'fat_loss'    ? 'fat_loss'    :
+    goal === 'muscle_gain' ? 'muscle_gain' :
+    goal === 'recomposition' ? 'recomp'   : 'maintenance'
+  )
+  if (cat === 'fat_loss')    return 'bg-red-500/10 text-red-400'
+  if (cat === 'muscle_gain') return 'bg-violet-500/10 text-violet-400'
+  if (cat === 'recomp')      return 'bg-blue-500/10 text-blue-400'
+  return 'bg-green-500/10 text-green-400'
+}
+
+function activityDisplay(profile) {
+  // New profiles have trainingDays/cardioDays/sportsDays; old profiles have activity string
+  if (profile.totalActiveDays !== undefined) {
+    const lbl = getActivityLabel(profile.totalActiveDays)
+    return {
+      label: lbl.label,
+      desc:  `${profile.trainingDays}d training · ${profile.cardioDays}d cardio · ${profile.sportsDays}d sports`,
+    }
+  }
+  const legacy = ACTIVITY_LABELS[profile.activity]
+  return { label: legacy?.label ?? 'Unknown', desc: legacy?.desc ?? '' }
+}
+
 export default function ProfileView({ profile, googleUser, onReset, onUpdate, onLogOut }) {
   const goal     = GOAL_LABELS[profile.goal]
-  const activity = ACTIVITY_LABELS[profile.activity]
   const bmi      = (profile.weight / ((profile.height / 100) ** 2)).toFixed(1)
+  const activity = activityDisplay(profile)
 
   return (
     <div className="space-y-4">
@@ -34,13 +59,8 @@ export default function ProfileView({ profile, googleUser, onReset, onUpdate, on
             <p className="text-slate-400 text-sm capitalize">
               {profile.sex} · {profile.age} yrs · {profile.height} cm
             </p>
-            <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold ${
-              profile.goal === 'fat_loss'    ? 'bg-red-500/10 text-red-400' :
-              profile.goal === 'muscle_gain' ? 'bg-violet-500/10 text-violet-400' :
-              profile.goal === 'recomposition' ? 'bg-blue-500/10 text-blue-400' :
-              'bg-green-500/10 text-green-400'
-            }`}>
-              {goal?.icon} {goal?.label}
+            <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold ${goalBadgeClass(profile.goal)}`}>
+              {goal?.icon} {goal?.label ?? profile.goal}
             </div>
           </div>
         </div>
@@ -48,7 +68,7 @@ export default function ProfileView({ profile, googleUser, onReset, onUpdate, on
         <StatRow label="Current weight" value={`${profile.weight} kg`} />
         <StatRow label="Goal weight"    value={`${profile.goalWeight} kg`} sub={`${Math.abs(profile.goalWeight - profile.weight)} kg to go`} />
         <StatRow label="BMI"            value={bmi} />
-        <StatRow label="Activity"       value={activity?.label} sub={activity?.desc} />
+        <StatRow label="Activity"       value={activity.label} sub={activity.desc} />
       </div>
 
       {/* Calorie & macro targets */}
@@ -58,9 +78,9 @@ export default function ProfileView({ profile, googleUser, onReset, onUpdate, on
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
             { label: 'Calories', val: profile.calorieTarget, unit: 'kcal', color: 'text-violet-400' },
-            { label: 'Protein', val: profile.macros.protein, unit: 'g', color: 'text-blue-400' },
-            { label: 'Carbs', val: profile.macros.carbs, unit: 'g', color: 'text-amber-400' },
-            { label: 'Fat', val: profile.macros.fat, unit: 'g', color: 'text-rose-400' },
+            { label: 'Protein',  val: profile.macros.protein, unit: 'g',   color: 'text-blue-400'   },
+            { label: 'Carbs',    val: profile.macros.carbs,   unit: 'g',   color: 'text-amber-400'  },
+            { label: 'Fat',      val: profile.macros.fat,     unit: 'g',   color: 'text-rose-400'   },
           ].map(s => (
             <div key={s.label} className="bg-[#1a1a28] rounded-xl p-3 text-center">
               <p className={`font-bold text-lg leading-none ${s.color}`}>{s.val}</p>
@@ -70,22 +90,26 @@ export default function ProfileView({ profile, googleUser, onReset, onUpdate, on
           ))}
         </div>
 
-        <div className="bg-[#1a1a28] rounded-xl p-3">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div>
-              <p className="text-slate-500 text-xs mb-0.5">BMR</p>
-              <p className="text-slate-200 font-bold">{profile.bmr} kcal</p>
+        {/* How it was calculated */}
+        <div className="bg-[#1a1a28] rounded-xl p-4 space-y-2">
+          <p className="text-slate-500 text-xs font-medium mb-1">Calorie breakdown</p>
+          {[
+            { label: 'BMR',              val: `${profile.bmr} kcal`,  color: 'text-slate-200' },
+            { label: `TDEE ×${profile.activityMultiplier ?? '?'}`, val: `${profile.tdee} kcal`, color: 'text-slate-200' },
+            {
+              label: 'Adjustment',
+              val: `${(profile.goalAdj ?? 0) > 0 ? '+' : ''}${profile.goalAdj ?? 0} kcal`,
+              color: (profile.goalAdj ?? 0) < 0 ? 'text-red-400' : (profile.goalAdj ?? 0) > 0 ? 'text-green-400' : 'text-slate-500',
+            },
+          ].map(row => (
+            <div key={row.label} className="flex justify-between">
+              <span className="text-slate-500 text-xs">{row.label}</span>
+              <span className={`text-xs font-semibold ${row.color}`}>{row.val}</span>
             </div>
-            <div>
-              <p className="text-slate-500 text-xs mb-0.5">TDEE</p>
-              <p className="text-slate-200 font-bold">{profile.tdee} kcal</p>
-            </div>
-            <div>
-              <p className="text-slate-500 text-xs mb-0.5">Adjustment</p>
-              <p className={`font-bold ${profile.calorieTarget > profile.tdee ? 'text-green-400' : profile.calorieTarget < profile.tdee ? 'text-amber-400' : 'text-slate-200'}`}>
-                {profile.calorieTarget > profile.tdee ? '+' : ''}{profile.calorieTarget - profile.tdee} kcal
-              </p>
-            </div>
+          ))}
+          <div className="flex justify-between pt-2 border-t border-[#22223a]">
+            <span className="text-slate-300 text-xs font-semibold">Target</span>
+            <span className="text-violet-400 text-sm font-bold">{profile.calorieTarget} kcal</span>
           </div>
         </div>
       </div>
@@ -161,9 +185,7 @@ export default function ProfileView({ profile, googleUser, onReset, onUpdate, on
           Start the onboarding again to reconfigure your profile and recalculate targets. Your tracking data will be preserved.
         </p>
         <button
-          onClick={() => {
-            if (window.confirm('Reset your profile and redo setup?')) onReset()
-          }}
+          onClick={() => { if (window.confirm('Reset your profile and redo setup?')) onReset() }}
           className="w-full py-3 rounded-xl border border-red-900/50 text-red-400 bg-red-900/10 hover:bg-red-900/20 font-semibold text-sm transition-colors"
         >
           Reset &amp; Redo Onboarding

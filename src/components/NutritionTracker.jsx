@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import BarcodeScanner from './BarcodeScanner'
 
 const today = () => new Date().toISOString().split('T')[0]
 
-// ─── Open Food Facts lookup ───────────────────────────────────────────────────
+// ─── Open Food Facts ──────────────────────────────────────────────────────────
 
 async function lookupBarcode(barcode) {
   const res = await fetch(
@@ -17,7 +17,6 @@ async function lookupBarcode(barcode) {
 
   const p = data.product || {}
   const n = p.nutriments || {}
-
   const kcal100 =
     n['energy-kcal_100g'] != null ? n['energy-kcal_100g']
     : n['energy-kcal']    != null ? n['energy-kcal']
@@ -25,18 +24,100 @@ async function lookupBarcode(barcode) {
     : 0
 
   return {
-    barcode,
+    type: 'barcode',
     name:   p.product_name || p.product_name_en || p.abbreviated_product_name || 'Unknown product',
     brand:  p.brands || '',
     image:  p.image_thumb_url || p.image_small_url || null,
     per100: {
       kcal:    Math.round(kcal100),
-      protein: Math.round((n.proteins_100g        ?? 0) * 10) / 10,
-      carbs:   Math.round((n.carbohydrates_100g   ?? 0) * 10) / 10,
-      fat:     Math.round((n.fat_100g             ?? 0) * 10) / 10,
+      protein: Math.round((n.proteins_100g      ?? 0) * 10) / 10,
+      carbs:   Math.round((n.carbohydrates_100g ?? 0) * 10) / 10,
+      fat:     Math.round((n.fat_100g           ?? 0) * 10) / 10,
     },
   }
 }
+
+// ─── Claude photo analysis ────────────────────────────────────────────────────
+
+async function resizeImage(dataUrl, maxDim = 1280) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.85))
+    }
+    img.src = dataUrl
+  })
+}
+
+async function analyzePhotoWithClaude(dataUrl) {
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set — add it to your .env.local file')
+
+  const resized = await resizeImage(dataUrl)
+  const [header, base64Data] = resized.split(',')
+  const mediaType = header.match(/data:(image\/\w+)/)?.[1] ?? 'image/jpeg'
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64Data },
+          },
+          {
+            type: 'text',
+            text: 'Analyze this food photo. Identify all foods visible, estimate portion sizes, and return ONLY a JSON object with: {"foodName": "string", "totalCalories": number, "protein": number, "carbs": number, "fat": number, "confidence": "high|medium|low", "breakdown": [{"item": "string", "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number}]}',
+          },
+        ],
+      }],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error?.message ?? `API error ${res.status}`)
+  }
+
+  const data = await res.json()
+  const text = data.content?.[0]?.text ?? ''
+  const match = text.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('Could not parse food analysis from response')
+
+  const parsed = JSON.parse(match[0])
+  const estimatedGrams = parsed.breakdown?.reduce((s, i) => s + (i.grams ?? 0), 0) || 300
+
+  return {
+    type: 'photo',
+    name: parsed.foodName ?? 'Food analysis',
+    confidence: parsed.confidence ?? 'medium',
+    breakdown: parsed.breakdown ?? [],
+    estimatedGrams,
+    per100: {
+      kcal:    Math.round((parsed.totalCalories / estimatedGrams) * 100),
+      protein: Math.round((parsed.protein       / estimatedGrams) * 1000) / 10,
+      carbs:   Math.round((parsed.carbs         / estimatedGrams) * 1000) / 10,
+      fat:     Math.round((parsed.fat           / estimatedGrams) * 1000) / 10,
+    },
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function scaleToGrams(per100, grams) {
   const r = Number(grams) / 100
@@ -48,7 +129,13 @@ function scaleToGrams(per100, grams) {
   }
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const CONFIDENCE_STYLE = {
+  high:   { label: 'High confidence',   cls: 'bg-green-400/10 text-green-400  border-green-400/20'  },
+  medium: { label: 'Medium confidence', cls: 'bg-amber-400/10 text-amber-400  border-amber-400/20'  },
+  low:    { label: 'Low confidence',    cls: 'bg-red-400/10   text-red-400    border-red-400/20'    },
+}
+
+// ─── MacroBar ─────────────────────────────────────────────────────────────────
 
 function MacroBar({ label, current, goal, colorFull, unit = 'g' }) {
   const pct  = Math.min((current / goal) * 100, 100)
@@ -63,10 +150,8 @@ function MacroBar({ label, current, goal, colorFull, unit = 'g' }) {
         </span>
       </div>
       <div className="h-2.5 bg-[#1a1a28] rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full bar-fill ${over ? 'bg-red-500' : colorFull}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-full rounded-full bar-fill ${over ? 'bg-red-500' : colorFull}`}
+          style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
@@ -78,19 +163,19 @@ export default function NutritionTracker({ profile, userId }) {
   const goals = { kcal: profile.calorieTarget, ...profile.macros }
   const [logs, setLogs] = useLocalStorage(`ft-${userId}-nutrition`, {})
 
-  // Manual form
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm]         = useState({ name: '', kcal: '', protein: '', carbs: '', fat: '' })
-  const [formError, setFormError] = useState('')
+  const [showForm, setShowForm]       = useState(false)
+  const [form, setForm]               = useState({ name: '', kcal: '', protein: '', carbs: '', fat: '' })
+  const [formError, setFormError]     = useState('')
 
-  // Barcode flow
-  const [scanning, setScanning]         = useState(false)
-  const [lookupState, setLookupState]   = useState(null) // null | 'loading' | 'error'
-  const [lookupError, setLookupError]   = useState('')
-  const [product, setProduct]           = useState(null)  // scanned product info
-  const [grams, setGrams]               = useState('100')
+  const [scanning, setScanning]       = useState(false)
+  const [lookupState, setLookupState] = useState(null) // null | 'loading' | 'error'
+  const [lookupError, setLookupError] = useState('')
+  const [product, setProduct]         = useState(null)
+  const [grams, setGrams]             = useState('100')
 
-  // ── Totals ────────────────────────────────────────────────────────────────
+  const photoInputRef = useRef(null)
+
+  // ── Totals ─────────────────────────────────────────────────────────────────
   const todayLogs = logs[today()] || []
   const totals = todayLogs.reduce(
     (a, m) => ({ kcal: a.kcal+m.kcal, protein: a.protein+m.protein, carbs: a.carbs+m.carbs, fat: a.fat+m.fat }),
@@ -98,7 +183,7 @@ export default function NutritionTracker({ profile, userId }) {
   )
   const remaining = { kcal: goals.kcal - totals.kcal, protein: goals.protein - totals.protein }
 
-  // ── Barcode handlers ──────────────────────────────────────────────────────
+  // ── Barcode ────────────────────────────────────────────────────────────────
   const handleBarcodeScan = async (code) => {
     setScanning(false)
     setLookupState('loading')
@@ -116,18 +201,50 @@ export default function NutritionTracker({ profile, userId }) {
     }
   }
 
-  const confirmScannedProduct = () => {
+  // ── Photo ──────────────────────────────────────────────────────────────────
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    setLookupState('loading')
+    setLookupError('')
+    setProduct(null)
+    setShowForm(false)
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result)
+        reader.onerror  = reject
+        reader.readAsDataURL(file)
+      })
+      const p = await analyzePhotoWithClaude(dataUrl)
+      setProduct(p)
+      setGrams(String(p.estimatedGrams))
+      setShowForm(true)
+    } catch (err) {
+      setLookupError(`Photo analysis failed: ${err.message}`)
+    } finally {
+      setLookupState(null)
+    }
+  }
+
+  // ── Confirm product (shared by barcode + photo) ────────────────────────────
+  const confirmProduct = () => {
     if (!product || !grams || Number(grams) <= 0) return
     const scaled = scaleToGrams(product.per100, grams)
-    const label = product.brand
-      ? `${product.name} (${product.brand}) — ${grams}g`
-      : `${product.name} — ${grams}g`
+    const label  = product.type === 'photo'
+      ? `${product.name} — ${grams}g (photo)`
+      : product.brand
+        ? `${product.name} (${product.brand}) — ${grams}g`
+        : `${product.name} — ${grams}g`
     pushMeal({ name: label, ...scaled })
     setProduct(null)
     setShowForm(false)
   }
 
-  // ── Manual meal handlers ──────────────────────────────────────────────────
+  // ── Manual ─────────────────────────────────────────────────────────────────
   const addManualMeal = () => {
     if (!form.name.trim()) return setFormError('Enter a meal name')
     if (!form.kcal || !form.protein || !form.carbs || !form.fat) return setFormError('Fill in all macro values')
@@ -149,16 +266,22 @@ export default function NutritionTracker({ profile, userId }) {
 
   const previewMacros = product && Number(grams) > 0 ? scaleToGrams(product.per100, grams) : null
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Barcode scanner overlay */}
       {scanning && (
-        <BarcodeScanner
-          onResult={handleBarcodeScan}
-          onClose={() => setScanning(false)}
-        />
+        <BarcodeScanner onResult={handleBarcodeScan} onClose={() => setScanning(false)} />
       )}
+
+      {/* Hidden photo input */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoChange}
+      />
 
       {/* ── Daily summary card ── */}
       <div className="glass-card p-5">
@@ -208,14 +331,14 @@ export default function NutritionTracker({ profile, userId }) {
       {lookupState === 'loading' && (
         <div className="glass-card p-4 flex items-center gap-3">
           <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-          <p className="text-slate-300 text-sm">Looking up product…</p>
+          <p className="text-slate-300 text-sm">Analysing…</p>
         </div>
       )}
       {lookupError && (
         <div className="bg-red-900/20 border border-red-700/40 rounded-2xl p-4 flex items-start gap-3">
           <span className="text-red-400 text-lg">⚠️</span>
           <div>
-            <p className="text-red-300 text-sm font-medium">Barcode lookup failed</p>
+            <p className="text-red-300 text-sm font-medium">Lookup failed</p>
             <p className="text-red-400/70 text-xs mt-0.5">{lookupError}</p>
             <button
               className="text-violet-400 text-xs mt-2 underline"
@@ -227,32 +350,49 @@ export default function NutritionTracker({ profile, userId }) {
         </div>
       )}
 
-      {/* ── Add meal / barcode form ── */}
-      {!showForm ? (
-        <div className="flex gap-2.5">
-          <button className="btn-primary flex-1" onClick={() => { setProduct(null); setShowForm(true) }}>
+      {/* ── Action buttons ── */}
+      {!showForm && (
+        <div className="space-y-2">
+          <button className="btn-primary w-full" onClick={() => { setProduct(null); setShowForm(true) }}>
             + Log Meal
           </button>
-          <button
-            className="btn-ghost flex items-center gap-2 px-4"
-            onClick={() => { setLookupError(''); setScanning(true) }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-              <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
-              <rect x="3" y="16" width="5" height="5"/>
-              <path d="M21 16h-3v3" strokeLinecap="round"/><path d="M21 19v2" strokeLinecap="round"/>
-              <path d="M16 16v3h2" strokeLinecap="round"/>
-              <path d="M11 3v5" strokeLinecap="round"/><path d="M11 11v2" strokeLinecap="round"/>
-              <path d="M3 11h8" strokeLinecap="round"/><path d="M3 16h4" strokeLinecap="round" strokeDasharray="2 2"/>
-            </svg>
-            <span className="text-sm">Scan</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              className="btn-ghost flex items-center justify-center gap-2 py-3"
+              onClick={() => { setLookupError(''); setScanning(true) }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
+                <rect x="3" y="16" width="5" height="5"/>
+                <path d="M21 16h-3v3" strokeLinecap="round"/><path d="M21 19v2" strokeLinecap="round"/>
+                <path d="M16 16v3h2" strokeLinecap="round"/>
+                <path d="M11 3v5" strokeLinecap="round"/><path d="M11 11v2" strokeLinecap="round"/>
+                <path d="M3 11h8" strokeLinecap="round"/>
+              </svg>
+              <span className="text-sm">Scan Barcode</span>
+            </button>
+            <button
+              className="btn-ghost flex items-center justify-center gap-2 py-3"
+              onClick={() => { setLookupError(''); photoInputRef.current?.click() }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span className="text-sm">Analyse Photo</span>
+            </button>
+          </div>
         </div>
-      ) : (
+      )}
+
+      {/* ── Add meal / product form ── */}
+      {showForm && (
         <div className="glass-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold">
-              {product ? 'Confirm Scanned Product' : 'Log a Meal'}
+              {product?.type === 'photo'    ? 'Photo Analysis'
+               : product?.type === 'barcode' ? 'Confirm Product'
+               : 'Log a Meal'}
             </h3>
             <button
               onClick={() => { setShowForm(false); setProduct(null) }}
@@ -260,8 +400,8 @@ export default function NutritionTracker({ profile, userId }) {
             >×</button>
           </div>
 
-          {/* ─ Scanned product card ─ */}
-          {product && (
+          {/* ─ Barcode product card ─ */}
+          {product?.type === 'barcode' && (
             <div className="mb-4">
               <div className="bg-[#1a1a28] border border-violet-600/30 rounded-xl p-4 mb-3">
                 <div className="flex items-start gap-3">
@@ -275,8 +415,8 @@ export default function NutritionTracker({ profile, userId }) {
                       {[
                         { label: `${product.per100.kcal} kcal`, color: 'text-violet-400 bg-violet-400/10' },
                         { label: `P ${product.per100.protein}g`, color: 'text-blue-400 bg-blue-400/10' },
-                        { label: `C ${product.per100.carbs}g`, color: 'text-amber-400 bg-amber-400/10' },
-                        { label: `F ${product.per100.fat}g`, color: 'text-rose-400 bg-rose-400/10' },
+                        { label: `C ${product.per100.carbs}g`,   color: 'text-amber-400 bg-amber-400/10' },
+                        { label: `F ${product.per100.fat}g`,     color: 'text-rose-400 bg-rose-400/10' },
                       ].map(b => (
                         <span key={b.label} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${b.color}`}>{b.label}</span>
                       ))}
@@ -286,44 +426,10 @@ export default function NutritionTracker({ profile, userId }) {
                 </div>
               </div>
 
-              {/* Gram input */}
-              <div className="mb-3">
-                <label className="text-slate-400 text-xs font-medium mb-1 block">How many grams did you eat?</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    className="input-dark pr-8 text-lg font-bold"
-                    value={grams}
-                    onChange={e => setGrams(e.target.value)}
-                    autoFocus
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">g</span>
-                </div>
-              </div>
+              <ProductGramInput grams={grams} setGrams={setGrams} previewMacros={previewMacros} />
 
-              {/* Live macro preview */}
-              {previewMacros && (
-                <div className="bg-violet-900/20 border border-violet-700/30 rounded-xl p-3 mb-3">
-                  <p className="text-violet-400/70 text-xs font-medium mb-2">For {grams}g:</p>
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    {[
-                      { label: 'Kcal',    val: previewMacros.kcal,    color: 'text-violet-400' },
-                      { label: 'Protein', val: `${previewMacros.protein}g`, color: 'text-blue-400'   },
-                      { label: 'Carbs',   val: `${previewMacros.carbs}g`,   color: 'text-amber-400'  },
-                      { label: 'Fat',     val: `${previewMacros.fat}g`,     color: 'text-rose-400'   },
-                    ].map(s => (
-                      <div key={s.label}>
-                        <p className={`font-bold text-base ${s.color}`}>{s.val}</p>
-                        <p className="text-slate-600 text-xs">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button className="btn-primary flex-1" onClick={confirmScannedProduct}
-                  disabled={!grams || Number(grams) <= 0}>
+              <div className="flex gap-2 mt-3">
+                <button className="btn-primary flex-1" onClick={confirmProduct} disabled={!grams || Number(grams) <= 0}>
                   Add to Log
                 </button>
                 <button className="btn-ghost" onClick={() => { setProduct(null); setScanning(true) }}>
@@ -338,7 +444,71 @@ export default function NutritionTracker({ profile, userId }) {
             </div>
           )}
 
-          {/* ─ Manual entry form ─ */}
+          {/* ─ Photo product card ─ */}
+          {product?.type === 'photo' && (
+            <div className="mb-4">
+              <div className="bg-[#1a1a28] border border-violet-600/30 rounded-xl p-4 mb-3">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <p className="text-white font-semibold text-sm leading-tight">{product.name}</p>
+                  {(() => {
+                    const c = CONFIDENCE_STYLE[product.confidence] ?? CONFIDENCE_STYLE.medium
+                    return (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${c.cls}`}>
+                        {c.label}
+                      </span>
+                    )
+                  })()}
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {[
+                    { label: `${product.per100.kcal} kcal`, color: 'text-violet-400 bg-violet-400/10' },
+                    { label: `P ${product.per100.protein}g`, color: 'text-blue-400 bg-blue-400/10' },
+                    { label: `C ${product.per100.carbs}g`,   color: 'text-amber-400 bg-amber-400/10' },
+                    { label: `F ${product.per100.fat}g`,     color: 'text-rose-400 bg-rose-400/10' },
+                  ].map(b => (
+                    <span key={b.label} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${b.color}`}>{b.label}</span>
+                  ))}
+                  <span className="text-slate-600 text-xs self-center">per 100g</span>
+                </div>
+
+                {product.breakdown?.length > 0 && (
+                  <div className="space-y-1 border-t border-[#22223a] pt-3">
+                    <p className="text-slate-500 text-xs font-medium mb-1.5">Identified items</p>
+                    {product.breakdown.map((item, i) => (
+                      <div key={i} className="flex justify-between items-baseline">
+                        <span className="text-slate-300 text-xs">{item.item}</span>
+                        <span className="text-slate-500 text-xs">{item.grams}g · {item.calories} kcal</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <ProductGramInput
+                grams={grams}
+                setGrams={setGrams}
+                previewMacros={previewMacros}
+                label={`Adjust serving size (estimated ${product.estimatedGrams}g)`}
+              />
+
+              <div className="flex gap-2 mt-3">
+                <button className="btn-primary flex-1" onClick={confirmProduct} disabled={!grams || Number(grams) <= 0}>
+                  Add to Log
+                </button>
+                <button className="btn-ghost" onClick={() => { setProduct(null); photoInputRef.current?.click() }}>
+                  Retake
+                </button>
+              </div>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#22223a]" /></div>
+                <div className="relative flex justify-center"><span className="bg-[#12121a] px-3 text-slate-600 text-xs">or enter manually</span></div>
+              </div>
+            </div>
+          )}
+
+          {/* ─ Manual entry ─ */}
           <div className="space-y-3">
             <input className="input-dark" placeholder="Meal name (e.g. Chicken & rice)"
               value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus={!product} />
@@ -401,6 +571,45 @@ export default function NutritionTracker({ profile, userId }) {
           ))
         }
       </div>
+    </div>
+  )
+}
+
+// ─── Shared gram-input + live preview ────────────────────────────────────────
+
+function ProductGramInput({ grams, setGrams, previewMacros, label = 'How many grams did you eat?' }) {
+  return (
+    <div>
+      <label className="text-slate-400 text-xs font-medium mb-1 block">{label}</label>
+      <div className="relative">
+        <input
+          type="number"
+          className="input-dark pr-8 text-lg font-bold"
+          value={grams}
+          onChange={e => setGrams(e.target.value)}
+          autoFocus
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">g</span>
+      </div>
+
+      {previewMacros && (
+        <div className="bg-violet-900/20 border border-violet-700/30 rounded-xl p-3 mt-2">
+          <p className="text-violet-400/70 text-xs font-medium mb-2">For {grams}g:</p>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {[
+              { label: 'Kcal',    val: previewMacros.kcal,         color: 'text-violet-400' },
+              { label: 'Protein', val: `${previewMacros.protein}g`, color: 'text-blue-400'   },
+              { label: 'Carbs',   val: `${previewMacros.carbs}g`,   color: 'text-amber-400'  },
+              { label: 'Fat',     val: `${previewMacros.fat}g`,     color: 'text-rose-400'   },
+            ].map(s => (
+              <div key={s.label}>
+                <p className={`font-bold text-base ${s.color}`}>{s.val}</p>
+                <p className="text-slate-600 text-xs">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
