@@ -37,9 +37,9 @@ async function lookupBarcode(barcode) {
   }
 }
 
-// ─── Claude photo analysis ────────────────────────────────────────────────────
+// ─── Claude photo analysis (via Netlify serverless proxy) ────────────────────
 
-async function resizeImage(dataUrl, maxDim = 1280) {
+async function resizeImage(dataUrl, maxDim = 1024) {
   return new Promise(resolve => {
     const img = new Image()
     img.onload = () => {
@@ -56,45 +56,19 @@ async function resizeImage(dataUrl, maxDim = 1280) {
 }
 
 async function analyzePhotoWithClaude(dataUrl) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set — add it to your .env.local file')
-
   const resized = await resizeImage(dataUrl)
   const [header, base64Data] = resized.split(',')
   const mediaType = header.match(/data:(image\/\w+)/)?.[1] ?? 'image/jpeg'
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/.netlify/functions/analyze-food', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64Data },
-          },
-          {
-            type: 'text',
-            text: 'Analyze this food photo. Identify all foods visible, estimate portion sizes, and return ONLY a JSON object with: {"foodName": "string", "totalCalories": number, "protein": number, "carbs": number, "fat": number, "confidence": "high|medium|low", "breakdown": [{"item": "string", "grams": number, "calories": number, "protein": number, "carbs": number, "fat": number}]}',
-          },
-        ],
-      }],
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageData: base64Data, mediaType }),
   })
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error?.message ?? `API error ${res.status}`)
-  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
 
-  const data = await res.json()
   const text = data.content?.[0]?.text ?? ''
   const match = text.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('Could not parse food analysis from response')
