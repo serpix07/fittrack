@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    background-color: #0a0a0f;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2d2d4a; border-radius: 2px; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-[#12121a] border border-[#1e1e30] rounded-2xl;
+  }
+  .input-dark {
+    @apply bg-[#1a1a28] border border-[#22223a] rounded-xl text-slate-200 placeholder-slate-600
+           focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50
+           transition-all duration-200 px-4 py-3 w-full text-sm;
+  }
+  .btn-primary {
+    @apply bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white font-semibold rounded-xl
+           px-5 py-3 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed
+           select-none;
+  }
+  .btn-ghost {
+    @apply bg-[#1a1a28] hover:bg-[#22223a] active:bg-[#2d2d4a] text-slate-300 font-medium rounded-xl
+           px-4 py-3 transition-all duration-150 border border-[#22223a] select-none;
+  }
+  .tab-active {
+    @apply text-violet-400 border-b-2 border-violet-500;
+  }
+  .tab-inactive {
+    @apply text-slate-500 border-b-2 border-transparent hover:text-slate-300;
+  }
+  .stat-card {
+    @apply bg-[#1a1a28] rounded-xl p-4 text-center;
+  }
+  .macro-pill {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+}
+
+/* Step transition animation */
+@keyframes stepFadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.step-animate { animation: stepFadeUp 0.28s ease-out both; }
+
+/* Bottom nav safe area */
+.bottom-nav-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 8px);
+}
+
+/* Smooth bar fill */
+.bar-fill { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Content bottom pad for nav */
+.content-area {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\\\\src\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName; \"---\"; Get-ChildItem \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "Read(//mnt/c/Users/adm.julen/**)",
+      "Read(//mnt/c/Users/adm.julen/mi-salud-app/**)",
+      "PowerShell(Get-Process *)"
+    ]
+  }
+}
