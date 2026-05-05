@@ -141,7 +141,7 @@ function MainApp({ user, logOut, canInstall, onInstall }) {
         )}
       </main>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav — 56px min height for finger-friendly tap targets */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0d0d18]/95 backdrop-blur-md border-t border-[#1e1e30] bottom-nav-safe">
         <div className="max-w-xl mx-auto flex">
           {TABS.map(tab => {
@@ -150,12 +150,12 @@ function MainApp({ user, logOut, canInstall, onInstall }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-1 py-2.5 transition-all duration-150 active:opacity-70 ${
+                className={`flex-1 flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 transition-all duration-150 active:opacity-70 ${
                   active ? 'text-violet-400' : 'text-slate-600 hover:text-slate-400'
                 }`}
               >
                 {tab.icon(active)}
-                <span className={`text-[10px] font-medium ${active ? 'text-violet-400' : 'text-slate-600'}`}>
+                <span className={`text-[11px] font-medium leading-none ${active ? 'text-violet-400' : 'text-slate-600'}`}>
                   {tab.label}
                 </span>
               </button>

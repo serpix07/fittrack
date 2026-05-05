@@ -138,18 +138,12 @@ function StepGoal({ data, update }) {
                   <div className="flex-1 min-w-0">
                     <p className={`font-semibold text-sm ${sel ? 'text-violet-300' : 'text-white'}`}>{g.label}</p>
                     <p className="text-slate-500 text-xs mt-0.5">{g.desc}</p>
-                    <div className="flex flex-wrap gap-2 mt-1.5">
-                      {g.weeklyChange !== 0 && (
-                        <span className="text-xs font-medium text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded-full">
-                          ~{g.weeklyChange > 0 ? '+' : ''}{g.weeklyChange} kg/week
-                        </span>
-                      )}
-                      {g.warn && (
-                        <span className="text-xs font-medium text-red-400/90 bg-red-400/10 px-2 py-0.5 rounded-full">
-                          ⚠ Demanding
-                        </span>
-                      )}
-                    </div>
+                    {g.warnText && (
+                      <p className="text-red-400 text-xs mt-1.5 font-medium">⚠ {g.warnText}</p>
+                    )}
+                    {g.note && (
+                      <p className="text-slate-500 text-xs mt-1.5 leading-relaxed italic">{g.note}</p>
+                    )}
                   </div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                     sel ? 'bg-violet-500 border-violet-500' : 'border-[#22223a]'
@@ -182,12 +176,12 @@ function DayPicker({ label, icon, desc, value, onChange }) {
         <div className="flex items-center gap-3 flex-shrink-0">
           <button
             onClick={() => onChange(Math.max(0, value - 1))}
-            className="w-8 h-8 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-lg leading-none"
+            className="w-11 h-11 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-xl leading-none"
           >−</button>
-          <span className="text-white font-bold text-lg w-6 text-center">{value}</span>
+          <span className="text-white font-bold text-xl w-6 text-center">{value}</span>
           <button
             onClick={() => onChange(Math.min(7, value + 1))}
-            className="w-8 h-8 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-lg leading-none"
+            className="w-11 h-11 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-xl leading-none"
           >+</button>
         </div>
       </div>
@@ -387,7 +381,7 @@ function StepReview({ data, update }) {
       {/* Macro targets */}
       <div className="glass-card p-4 mb-3">
         <p className="text-slate-500 text-xs font-medium mb-3">Daily Nutrition Targets</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2 mb-3">
           {[
             { label: 'Calories', val: preview.calorieTarget, unit: 'kcal', color: 'text-violet-400' },
             { label: 'Protein',  val: preview.macros.protein, unit: 'g',   color: 'text-blue-400'   },
@@ -401,6 +395,9 @@ function StepReview({ data, update }) {
             </div>
           ))}
         </div>
+        <p className="text-slate-600 text-xs text-center">
+          Protein {(preview.macros.protein / Number(data.weight)).toFixed(1)} g/kg · Fat {(preview.macros.fat / Number(data.weight)).toFixed(1)} g/kg · Carbs {(preview.macros.carbs / Number(data.weight)).toFixed(1)} g/kg
+        </p>
       </div>
 
       {/* How it was calculated */}
@@ -512,14 +509,15 @@ export default function Onboarding({ onComplete }) {
         {step === 6 && <StepReview   {...stepProps} />}
       </div>
 
-      <div className="px-5 pb-8 pt-4 flex gap-3 max-w-md mx-auto w-full">
+      <div className="px-5 pb-safe pt-4 flex gap-3 max-w-md mx-auto w-full"
+        style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}>
         {step > 0 && (
-          <button className="btn-ghost flex-1" onClick={() => setStep(s => s - 1)}>
+          <button className="btn-ghost flex-1 text-base" onClick={() => setStep(s => s - 1)}>
             ← Back
           </button>
         )}
         <button
-          className="btn-primary flex-1"
+          className="btn-primary flex-1 text-base"
           disabled={!canProceed()}
           onClick={handleNext}
         >

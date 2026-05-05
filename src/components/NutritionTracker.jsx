@@ -326,34 +326,48 @@ export default function NutritionTracker({ profile, userId }) {
 
       {/* ── Action buttons ── */}
       {!showForm && (
-        <div className="space-y-2">
-          <button className="btn-primary w-full" onClick={() => { setProduct(null); setShowForm(true) }}>
-            + Log Meal
+        <div className="space-y-2.5">
+          {/* Primary: log meal */}
+          <button
+            className="btn-primary w-full flex items-center justify-center gap-2 text-base"
+            onClick={() => { setProduct(null); setShowForm(true) }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5 flex-shrink-0">
+              <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round"/>
+              <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round"/>
+            </svg>
+            Log Meal
           </button>
-          <div className="grid grid-cols-2 gap-2">
+
+          {/* Secondary: scan + photo */}
+          <div className="grid grid-cols-2 gap-2.5">
             <button
-              className="btn-ghost flex items-center justify-center gap-2 py-3"
+              className="btn-ghost flex flex-col items-center justify-center gap-1.5 py-4 min-h-[64px]"
               onClick={() => { setLookupError(''); setScanning(true) }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
-                <rect x="3" y="16" width="5" height="5"/>
-                <path d="M21 16h-3v3" strokeLinecap="round"/><path d="M21 19v2" strokeLinecap="round"/>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 text-violet-400">
+                <rect x="3" y="3" width="5" height="5" rx="0.5"/>
+                <rect x="16" y="3" width="5" height="5" rx="0.5"/>
+                <rect x="3" y="16" width="5" height="5" rx="0.5"/>
+                <path d="M21 16h-3v3" strokeLinecap="round"/>
+                <path d="M21 19v2" strokeLinecap="round"/>
                 <path d="M16 16v3h2" strokeLinecap="round"/>
-                <path d="M11 3v5" strokeLinecap="round"/><path d="M11 11v2" strokeLinecap="round"/>
+                <path d="M11 3v5" strokeLinecap="round"/>
+                <path d="M11 11v2" strokeLinecap="round"/>
                 <path d="M3 11h8" strokeLinecap="round"/>
               </svg>
-              <span className="text-sm">Scan Barcode</span>
+              <span className="text-sm font-semibold text-slate-200">Scan Barcode</span>
             </button>
+
             <button
-              className="btn-ghost flex items-center justify-center gap-2 py-3"
+              className="btn-ghost flex flex-col items-center justify-center gap-1.5 py-4 min-h-[64px]"
               onClick={() => { setLookupError(''); photoInputRef.current?.click() }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 text-violet-400">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
-              <span className="text-sm">Analyse Photo</span>
+              <span className="text-sm font-semibold text-slate-200">Analyse Photo</span>
             </button>
           </div>
         </div>
