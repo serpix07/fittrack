@@ -2,10 +2,67 @@
   command = "npm run build"
   publish = "dist"
 
+# Pin Node 18 so native fetch is available in serverless functions
+[build.environment]
+  NODE_VERSION = "18"
+
 [functions]
   directory = "netlify/functions"
 
+# ── Headers ──────────────────────────────────────────────────────────────────
+# Explicit MIME types prevent the CDN ever returning text/html for script files.
+# This matters when a browser fetches <script type="module"> — wrong MIME type
+# causes an immediate "Failed to load module script" error.
+
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "*.mjs"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Content-Type = "text/css; charset=utf-8"
+
+# Vite hashes asset filenames → safe to cache forever
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML must never be cached so deploys take effect immediately
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# ── Redirects (order matters — first match wins) ──────────────────────────────
+
+# 1. Netlify functions — let the functions router handle these, never rewrite
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from  = "/.netlify/functions/*"
+  to    = "/.netlify/functions/:splat"
+  status = 200
+  force  = false
+
+# 2. Static assets — serve the real file; never fall through to index.html.
+#    This rule must come BEFORE the /* catch-all so that requests for
+#    /assets/index-abc123.js match here and Netlify serves the JS file
+#    instead of rewriting to index.html.
+[[redirects]]
+  from  = "/assets/*"
+  to    = "/assets/:splat"
+  status = 200
+  force  = false
+
+# 3. SPA catch-all — only reached for paths that have no matching file or
+#    earlier rule. Serves index.html so client-side routing works.
+[[redirects]]
+  from  = "/*"
+  to    = "/index.html"
   status = 200
