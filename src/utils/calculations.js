@@ -28,10 +28,26 @@ export const ACTIVITY_LABELS = {
 // ─── New: base lifestyle activity (without exercise) ─────────────────────────
 
 export const BASE_ACTIVITY_LABELS = {
-  sedentary:         { label: 'Sedentary',         icon: '🪑', desc: 'Desk job, mostly sitting',               multiplier: 1.2   },
-  lightly_active:    { label: 'Lightly active',    icon: '🚶', desc: 'Teacher, retail, some walking',          multiplier: 1.375 },
-  moderately_active: { label: 'Moderately active', icon: '🏃', desc: 'Construction, nurse, lots of walking',   multiplier: 1.55  },
-  very_active:       { label: 'Very active',       icon: '💪', desc: 'Physical labor, delivery, on feet all day', multiplier: 1.725 },
+  sedentary: {
+    label: 'Sedentary', icon: '🪑',
+    desc: "I spend most of my day sitting (student, office worker, gamer). I don't move much outside of workouts.",
+    multiplier: 1.2,
+  },
+  lightly_active: {
+    label: 'Lightly active', icon: '🚶',
+    desc: 'I walk around during the day but nothing intense (teacher, shop worker, light housework).',
+    multiplier: 1.375,
+  },
+  moderately_active: {
+    label: 'Moderately active', icon: '🏃',
+    desc: "I'm on my feet most of the day or do physical work (nurse, waiter, construction).",
+    multiplier: 1.55,
+  },
+  very_active: {
+    label: 'Very active', icon: '💪',
+    desc: 'I have a very physical job AND train hard (professional athlete, military, manual labor + gym).',
+    multiplier: 1.725,
+  },
 }
 
 // Additional kcal/day from intentional exercise — indexed by days per week (0–7)

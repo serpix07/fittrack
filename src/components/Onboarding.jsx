@@ -201,27 +201,40 @@ function StepActivity({ data, update }) {
   const exerciseDays  = Number(data.exerciseDays)
   const exerciseBonus = EXERCISE_BONUS_TABLE[Math.min(7, exerciseDays)] ?? 0
   const baseMult      = BASE_ACTIVITY_LABELS[data.baseActivity]?.multiplier ?? 1.2
+  const hasWorkouts   = exerciseDays > 0 || data.sports.length > 0
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-white mb-1">Daily Lifestyle</h2>
-      <p className="text-slate-400 text-sm mb-4">How active is your day WITHOUT counting workouts?</p>
+      <p className="text-slate-400 text-sm mb-1">How active is your typical day?</p>
+      <p className="text-slate-500 text-xs mb-4 leading-relaxed">
+        Think about your <span className="text-slate-300 font-medium">total daily life</span> — work, study, and daily movement. <span className="text-slate-300 font-medium">Do NOT count your workouts</span> here. Those are added separately below.
+      </p>
+
+      {hasWorkouts && (
+        <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-3 py-2.5 mb-4 flex items-start gap-2">
+          <span className="text-amber-400 text-base flex-shrink-0">💡</span>
+          <p className="text-amber-200/80 text-xs leading-relaxed">
+            Since you already told us about your workouts, choose the level that describes your day-to-day life <span className="font-medium">without</span> counting them.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2 mb-6">
         {BASE_ACTIVITY_OPTIONS.map(opt => {
           const sel = data.baseActivity === opt.id
           return (
             <button key={opt.id} onClick={() => update('baseActivity', opt.id)}
-              className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+              className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all ${
                 sel ? 'bg-violet-600/15 border-violet-500 ring-1 ring-violet-500/30'
                     : 'bg-[#12121a] border-[#1e1e30] hover:border-[#2d2d4a]'
               }`}>
-              <span className="text-2xl w-8 text-center">{opt.icon}</span>
+              <span className="text-2xl w-8 text-center mt-0.5 flex-shrink-0">{opt.icon}</span>
               <div className="flex-1 min-w-0">
                 <p className={`font-semibold text-sm ${sel ? 'text-violet-300' : 'text-white'}`}>{opt.label}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{opt.desc}</p>
+                <p className="text-slate-500 text-xs mt-1 leading-relaxed">{opt.desc}</p>
               </div>
-              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-all ${
                 sel ? 'bg-violet-500 border-violet-500' : 'border-[#22223a]'
               }`}>
                 {sel && <span className="text-white text-xs">✓</span>}
