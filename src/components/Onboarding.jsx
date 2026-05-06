@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   GOAL_LABELS, buildProfile, calcRecommendedBedtime,
-  getActivityLabel, getActivityMultiplier,
+  BASE_ACTIVITY_LABELS, EXERCISE_BONUS_TABLE,
 } from '../utils/calculations'
 
 const ALL_SPORTS = [
@@ -26,7 +26,7 @@ const TOTAL_STEPS = 7
 const EMPTY_DATA = {
   name: '', sex: 'male', age: '', height: '', weight: '', goalWeight: '',
   goal: '',
-  trainingDays: 0, cardioDays: 0, sportsDays: 0,
+  baseActivity: 'sedentary', exerciseDays: 0, sportsDays: 0,
   sports: [],
   wakeTime: '07:00', destination: 'work', travelTime: '30',
   photo: null,
@@ -163,7 +163,7 @@ function StepGoal({ data, update }) {
 
 // ─── Step 3: Activity ─────────────────────────────────────────────────────────
 
-function DayPicker({ label, icon, desc, value, onChange }) {
+function DayPicker({ label, icon, desc, value, onChange, max = 7 }) {
   return (
     <div className="bg-[#12121a] border border-[#1e1e30] rounded-2xl p-4">
       <div className="flex items-center justify-between">
@@ -181,7 +181,7 @@ function DayPicker({ label, icon, desc, value, onChange }) {
           >−</button>
           <span className="text-white font-bold text-xl w-6 text-center">{value}</span>
           <button
-            onClick={() => onChange(Math.min(7, value + 1))}
+            onClick={() => onChange(Math.min(max, value + 1))}
             className="w-11 h-11 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-xl leading-none"
           >+</button>
         </div>
@@ -195,49 +195,64 @@ function DayPicker({ label, icon, desc, value, onChange }) {
   )
 }
 
+const BASE_ACTIVITY_OPTIONS = Object.entries(BASE_ACTIVITY_LABELS).map(([id, v]) => ({ id, ...v }))
+
 function StepActivity({ data, update }) {
-  const totalDays = Number(data.trainingDays) + Number(data.cardioDays) + Number(data.sportsDays)
-  const actLabel  = getActivityLabel(totalDays)
-  const multiplier = getActivityMultiplier(totalDays)
+  const exerciseDays  = Number(data.exerciseDays)
+  const exerciseBonus = EXERCISE_BONUS_TABLE[Math.min(7, exerciseDays)] ?? 0
+  const baseMult      = BASE_ACTIVITY_LABELS[data.baseActivity]?.multiplier ?? 1.2
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-1">Weekly Activity</h2>
-      <p className="text-slate-400 text-sm mb-5">How many days per week do you do each type?</p>
+      <h2 className="text-2xl font-bold text-white mb-1">Daily Lifestyle</h2>
+      <p className="text-slate-400 text-sm mb-4">How active is your day WITHOUT counting workouts?</p>
 
-      <div className="space-y-3 mb-4">
-        <DayPicker
-          label="Weight Training"
-          icon="🏋️"
-          desc="Gym, resistance, HIIT"
-          value={Number(data.trainingDays)}
-          onChange={v => update('trainingDays', v)}
-        />
-        <DayPicker
-          label="Cardio"
-          icon="🏃"
-          desc="Running solo, cycling, elliptical"
-          value={Number(data.cardioDays)}
-          onChange={v => update('cardioDays', v)}
-        />
-        <DayPicker
-          label="Sports / Team"
-          icon="⚽"
-          desc="Basketball, football, swimming with a team"
-          value={Number(data.sportsDays)}
-          onChange={v => update('sportsDays', v)}
-        />
+      <div className="space-y-2 mb-6">
+        {BASE_ACTIVITY_OPTIONS.map(opt => {
+          const sel = data.baseActivity === opt.id
+          return (
+            <button key={opt.id} onClick={() => update('baseActivity', opt.id)}
+              className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                sel ? 'bg-violet-600/15 border-violet-500 ring-1 ring-violet-500/30'
+                    : 'bg-[#12121a] border-[#1e1e30] hover:border-[#2d2d4a]'
+              }`}>
+              <span className="text-2xl w-8 text-center">{opt.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className={`font-semibold text-sm ${sel ? 'text-violet-300' : 'text-white'}`}>{opt.label}</p>
+                <p className="text-slate-500 text-xs mt-0.5">{opt.desc}</p>
+              </div>
+              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                sel ? 'bg-violet-500 border-violet-500' : 'border-[#22223a]'
+              }`}>
+                {sel && <span className="text-white text-xs">✓</span>}
+              </div>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="bg-violet-900/20 border border-violet-700/30 rounded-2xl p-4 flex items-center gap-3">
-        <span className="text-2xl">{actLabel.icon}</span>
-        <div>
-          <p className="text-violet-300 font-semibold text-sm">{actLabel.label}</p>
-          <p className="text-slate-400 text-xs mt-0.5">
-            {totalDays} active day{totalDays !== 1 ? 's' : ''}/week · ×{multiplier} TDEE multiplier
-          </p>
+      <h3 className="text-white font-semibold text-base mb-1">Intentional Exercise</h3>
+      <p className="text-slate-400 text-sm mb-3">How many days/week do you work out? (gym, sports, cardio — everything counts)</p>
+
+      <DayPicker
+        label="Workout days per week"
+        icon="🏋️"
+        desc="All intentional exercise combined"
+        value={exerciseDays}
+        onChange={v => {
+          update('exerciseDays', v)
+          if (Number(data.sportsDays) > v) update('sportsDays', v)
+        }}
+      />
+
+      {exerciseDays > 0 && (
+        <div className="mt-3 bg-violet-900/20 border border-violet-700/30 rounded-2xl p-4">
+          <p className="text-violet-300 font-semibold text-sm mb-1">Your estimated TDEE components</p>
+          <p className="text-slate-400 text-xs">Lifestyle baseline: ×{baseMult}</p>
+          <p className="text-slate-400 text-xs">Exercise bonus: +{exerciseBonus} kcal/day</p>
+          <p className="text-slate-500 text-xs mt-1 italic">Sport bonus added in next step</p>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -251,11 +266,13 @@ function StepSports({ data, update }) {
       : [...data.sports, id]
     update('sports', next)
   }
+  const maxSportsDays = Number(data.exerciseDays)
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-white mb-1">Your Sports</h2>
-      <p className="text-slate-400 text-sm mb-6">Select all activities you practise regularly</p>
-      <div className="grid grid-cols-2 gap-2.5">
+      <p className="text-slate-400 text-sm mb-4">Select all activities you practise regularly</p>
+      <div className="grid grid-cols-2 gap-2.5 mb-5">
         {ALL_SPORTS.map(s => {
           const sel = data.sports.includes(s.id)
           return (
@@ -271,7 +288,17 @@ function StepSports({ data, update }) {
         })}
       </div>
       {data.sports.length === 0 && (
-        <p className="text-amber-400/80 text-xs mt-4 text-center">Pick at least one activity to continue</p>
+        <p className="text-amber-400/80 text-xs mb-4 text-center">Pick at least one activity to continue</p>
+      )}
+      {data.sports.length > 0 && (
+        <DayPicker
+          label="Sport/game sessions per week"
+          icon="⚽"
+          desc="How many of your exercise days involve these sports?"
+          value={Number(data.sportsDays)}
+          onChange={v => update('sportsDays', v)}
+          max={Math.max(maxSportsDays, 7)}
+        />
       )}
     </div>
   )
@@ -351,7 +378,8 @@ function StepSchedule({ data, update }) {
 function StepReview({ data, update }) {
   const preview    = buildProfile(data)
   const goalInfo   = GOAL_LABELS[data.goal]
-  const actLabel   = getActivityLabel(preview.totalActiveDays)
+  const breakdown  = preview.tdeeBreakdown
+  const baseLabel  = BASE_ACTIVITY_LABELS[data.baseActivity]
 
   const handlePhoto = e => {
     const file = e.target.files[0]
@@ -413,10 +441,22 @@ function StepReview({ data, update }) {
               valColor: 'text-slate-200',
             },
             {
-              label: `TDEE  ×${preview.activityMultiplier}`,
-              sub: `${actLabel.label} — ${preview.totalActiveDays} active days/week`,
-              val: `${preview.tdee} kcal`,
+              label: `Base TDEE ×${baseLabel?.multiplier}`,
+              sub: `${baseLabel?.label} — lifestyle baseline`,
+              val: `${breakdown.baseTDEE} kcal`,
               valColor: 'text-slate-200',
+            },
+            {
+              label: 'Exercise bonus',
+              sub: `${data.exerciseDays} workout day${Number(data.exerciseDays) !== 1 ? 's' : ''}/week`,
+              val: breakdown.exerciseBonus > 0 ? `+${breakdown.exerciseBonus} kcal` : '0 kcal',
+              valColor: breakdown.exerciseBonus > 0 ? 'text-green-400' : 'text-slate-500',
+            },
+            {
+              label: 'Sport bonus',
+              sub: `${data.sportsDays} sport session${Number(data.sportsDays) !== 1 ? 's' : ''}/week · avg ${Math.round(breakdown.sportBonus * 7 / (Number(data.sportsDays) || 1))} kcal/session`,
+              val: breakdown.sportBonus > 0 ? `+${breakdown.sportBonus} kcal` : '0 kcal',
+              valColor: breakdown.sportBonus > 0 ? 'text-blue-400' : 'text-slate-500',
             },
             {
               label: goalInfo?.label ?? data.goal,
@@ -440,6 +480,12 @@ function StepReview({ data, update }) {
             <span className="text-violet-400 font-bold text-xl">{preview.calorieTarget} kcal</span>
           </div>
         </div>
+        <div className="mt-3 bg-blue-900/20 border border-blue-700/30 rounded-xl p-3">
+          <p className="text-blue-300 text-xs font-semibold mb-1">💡 Net calories tip</p>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            Your target already accounts for your regular training. On days you do an extra or longer session, you can eat back some of those calories to stay on track — this is called <span className="text-blue-300 font-medium">net calories</span>. Log your workouts and add them to today's goal if you want day-by-day precision.
+          </p>
+        </div>
       </div>
 
       {/* Sleep & fitness */}
@@ -451,7 +497,7 @@ function StepReview({ data, update }) {
             <p className="text-slate-500 text-xs">Bedtime</p>
           </div>
           <div className="text-center">
-            <p className="text-green-400 font-bold text-base">{actLabel.icon} {actLabel.label}</p>
+            <p className="text-green-400 font-bold text-base">{baseLabel?.icon} {baseLabel?.label}</p>
             <p className="text-slate-500 text-xs">Activity</p>
           </div>
           <div className="text-center">

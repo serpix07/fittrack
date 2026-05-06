@@ -25,6 +25,18 @@ export const ACTIVITY_LABELS = {
   very_high: { label: 'Very High', icon: '🏆', desc: 'Athlete / twice-a-day training',  multiplier: 1.725 },
 }
 
+// ─── New: base lifestyle activity (without exercise) ─────────────────────────
+
+export const BASE_ACTIVITY_LABELS = {
+  sedentary:         { label: 'Sedentary',         icon: '🪑', desc: 'Desk job, mostly sitting',               multiplier: 1.2   },
+  lightly_active:    { label: 'Lightly active',    icon: '🚶', desc: 'Teacher, retail, some walking',          multiplier: 1.375 },
+  moderately_active: { label: 'Moderately active', icon: '🏃', desc: 'Construction, nurse, lots of walking',   multiplier: 1.55  },
+  very_active:       { label: 'Very active',       icon: '💪', desc: 'Physical labor, delivery, on feet all day', multiplier: 1.725 },
+}
+
+// Additional kcal/day from intentional exercise — indexed by days per week (0–7)
+export const EXERCISE_BONUS_TABLE = [0, 100, 100, 200, 200, 300, 300, 400]
+
 // ─── Goal labels ──────────────────────────────────────────────────────────────
 
 export const GOAL_LABELS = {
@@ -108,16 +120,16 @@ const GOAL_PROTEIN_MULTIPLIER = {
   muscle_gain:   2.0,
 }
 
-// ─── Sport bonus (kcal per session) ──────────────────────────────────────────
+// ─── Sport bonus (kcal per session, used in daily average) ───────────────────
 
-const SPORT_BONUS = {
-  basketball: 200,
-  football:   200,
-  swimming:   250,
-  cycling:    250,
-  running:    300,
-  gym:          0,
-  other:      150,
+const SPORT_KCAL_PER_SESSION = {
+  gym:        50,
+  basketball: 80,
+  football:   80,
+  running:    100,
+  swimming:   90,
+  cycling:    90,
+  other:      60,
 }
 
 // ─── Sport config (used by WorkoutLog + Profile) ──────────────────────────────
@@ -147,9 +159,20 @@ export function calcBMR({ sex, age, height, weight }) {
   return Math.round(sex === 'male' ? base + 5 : base - 161)
 }
 
-export function calcTDEE(bmr, { trainingDays = 0, cardioDays = 0, sportsDays = 0, sports = [] } = {}) {
-  const totalDays = trainingDays + cardioDays + sportsDays
-  return Math.round(bmr * getActivityMultiplier(totalDays))
+// Returns { baseTDEE, exerciseBonus, sportBonus, total }
+export function calcTDEE(bmr, { baseActivity = 'sedentary', exerciseDays = 0, sportsDays = 0, sports = [] } = {}) {
+  const multiplier    = BASE_ACTIVITY_LABELS[baseActivity]?.multiplier ?? 1.2
+  const baseTDEE      = Math.round(bmr * multiplier)
+  const exerciseBonus = EXERCISE_BONUS_TABLE[Math.min(7, Math.max(0, Number(exerciseDays)))] ?? 0
+
+  const sportList = Array.isArray(sports) ? sports : []
+  const avgKcalPerSession = sportList.length > 0
+    ? sportList.reduce((sum, s) => sum + (SPORT_KCAL_PER_SESSION[s] ?? 60), 0) / sportList.length
+    : 0
+  const sportBonus = Math.round((avgKcalPerSession * Math.max(0, Number(sportsDays))) / 7)
+
+  const total = baseTDEE + exerciseBonus + sportBonus
+  return { baseTDEE, exerciseBonus, sportBonus, total }
 }
 
 export function calcCalorieTarget(tdee, goal) {
@@ -187,17 +210,17 @@ export function calcRecommendedBedtime(wakeTime) {
 
 export function buildProfile(data) {
   const weight       = Number(data.weight)
-  const trainingDays = Number(data.trainingDays ?? 0)
-  const cardioDays   = Number(data.cardioDays   ?? 0)
+  const baseActivity = data.baseActivity ?? 'sedentary'
+  const exerciseDays = Number(data.exerciseDays ?? 0)
   const sportsDays   = Number(data.sportsDays   ?? 0)
   const sports       = data.sports ?? []
-  const totalActiveDays = trainingDays + cardioDays + sportsDays
 
-  const bmr           = calcBMR({ sex: data.sex, age: Number(data.age), height: Number(data.height), weight })
-  const tdee          = calcTDEE(bmr, { trainingDays, cardioDays, sportsDays, sports })
-  const goalAdj       = GOAL_LABELS[data.goal]?.adj ?? 0
-  const calorieTarget = calcCalorieTarget(tdee, data.goal)
-  const macros        = calcMacros(weight, calorieTarget, data.goal)
+  const bmr            = calcBMR({ sex: data.sex, age: Number(data.age), height: Number(data.height), weight })
+  const tdeeResult     = calcTDEE(bmr, { baseActivity, exerciseDays, sportsDays, sports })
+  const tdee           = tdeeResult.total
+  const goalAdj        = GOAL_LABELS[data.goal]?.adj ?? 0
+  const calorieTarget  = calcCalorieTarget(tdee, data.goal)
+  const macros         = calcMacros(weight, calorieTarget, data.goal)
   const recommendedBedtime = calcRecommendedBedtime(data.wakeTime)
 
   return {
@@ -205,13 +228,10 @@ export function buildProfile(data) {
     sex: data.sex, age: Number(data.age), height: Number(data.height),
     weight, goalWeight: Number(data.goalWeight),
     goal: data.goal,
-    trainingDays, cardioDays, sportsDays, totalActiveDays,
-    activityMultiplier: getActivityMultiplier(totalActiveDays),
-    activity: data.activity ?? null,
-    sports,
+    baseActivity, exerciseDays, sportsDays, sports,
     wakeTime: data.wakeTime, destination: data.destination, travelTime: Number(data.travelTime),
     photo: data.photo ?? null,
-    bmr, tdee, goalAdj, calorieTarget, macros, recommendedBedtime,
+    bmr, tdee, tdeeBreakdown: tdeeResult, goalAdj, calorieTarget, macros, recommendedBedtime,
     startWeight: weight,
     startDate: new Date().toISOString().split('T')[0],
   }
