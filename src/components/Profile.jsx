@@ -1,4 +1,4 @@
-import { GOAL_LABELS, ACTIVITY_LABELS, SPORT_CONFIG, getActivityLabel, BASE_ACTIVITY_LABELS } from '../utils/calculations'
+import { GOAL_LABELS, ACTIVITY_LABELS, SPORT_CONFIG, getActivityLabel, ACTIVITY_LEVELS } from '../utils/calculations'
 
 function StatRow({ label, value, sub }) {
   return (
@@ -25,23 +25,24 @@ function goalBadgeClass(goal) {
 }
 
 function activityDisplay(profile) {
-  // Newest format: has baseActivity
-  if (profile.baseActivity) {
-    const base = BASE_ACTIVITY_LABELS[profile.baseActivity]
-    const parts = []
-    if (profile.exerciseDays > 0) parts.push(`${profile.exerciseDays}d/week exercise`)
-    if (profile.sportsDays   > 0) parts.push(`${profile.sportsDays}d/week sport`)
-    return { label: base?.label ?? profile.baseActivity, desc: parts.join(' · ') || 'No exercise logged' }
+  // Current format: activityLevel key
+  if (profile.activityLevel) {
+    const lv = ACTIVITY_LEVELS[profile.activityLevel]
+    return { label: lv?.label ?? profile.activityLevel, desc: lv?.desc ?? '' }
   }
-  // Old format: trainingDays/cardioDays/sportsDays
+  // Previous format: baseActivity (interim)
+  if (profile.baseActivity) {
+    return { label: profile.baseActivity.replace(/_/g, ' '), desc: `${profile.exerciseDays ?? 0}d/week exercise` }
+  }
+  // Older format: totalActiveDays
   if (profile.totalActiveDays !== undefined) {
     const lbl = getActivityLabel(profile.totalActiveDays)
     return {
       label: lbl.label,
-      desc:  `${profile.trainingDays}d training · ${profile.cardioDays}d cardio · ${profile.sportsDays}d sports`,
+      desc:  `${profile.trainingDays ?? 0}d training · ${profile.cardioDays ?? 0}d cardio · ${profile.sportsDays ?? 0}d sports`,
     }
   }
-  // Legacy string
+  // Legacy activity string
   const legacy = ACTIVITY_LABELS[profile.activity]
   return { label: legacy?.label ?? 'Unknown', desc: legacy?.desc ?? '' }
 }
@@ -102,55 +103,24 @@ export default function ProfileView({ profile, googleUser, onReset, onUpdate, on
         {/* How it was calculated */}
         <div className="bg-[#1a1a28] rounded-xl p-4 space-y-2">
           <p className="text-slate-500 text-xs font-medium mb-1">Calorie breakdown</p>
-          {profile.tdeeBreakdown ? (
-            <>
-              {[
-                { label: 'BMR', val: `${profile.bmr} kcal`, color: 'text-slate-200' },
-                {
-                  label: `Base TDEE ×${BASE_ACTIVITY_LABELS[profile.baseActivity]?.multiplier ?? '?'}`,
-                  val: `${profile.tdeeBreakdown.baseTDEE} kcal`,
-                  color: 'text-slate-200',
-                },
-                {
-                  label: `Exercise bonus (${profile.exerciseDays}d/wk)`,
-                  val: profile.tdeeBreakdown.exerciseBonus > 0 ? `+${profile.tdeeBreakdown.exerciseBonus} kcal` : '0 kcal',
-                  color: profile.tdeeBreakdown.exerciseBonus > 0 ? 'text-green-400' : 'text-slate-500',
-                },
-                {
-                  label: `Sport bonus (${profile.sportsDays}d/wk)`,
-                  val: profile.tdeeBreakdown.sportBonus > 0 ? `+${profile.tdeeBreakdown.sportBonus} kcal` : '0 kcal',
-                  color: profile.tdeeBreakdown.sportBonus > 0 ? 'text-blue-400' : 'text-slate-500',
-                },
-                {
-                  label: 'Goal adjustment',
-                  val: `${(profile.goalAdj ?? 0) > 0 ? '+' : ''}${profile.goalAdj ?? 0} kcal`,
-                  color: (profile.goalAdj ?? 0) < 0 ? 'text-red-400' : (profile.goalAdj ?? 0) > 0 ? 'text-green-400' : 'text-slate-500',
-                },
-              ].map(row => (
-                <div key={row.label} className="flex justify-between">
-                  <span className="text-slate-500 text-xs">{row.label}</span>
-                  <span className={`text-xs font-semibold ${row.color}`}>{row.val}</span>
-                </div>
-              ))}
-            </>
-          ) : (
-            <>
-              {[
-                { label: 'BMR',              val: `${profile.bmr} kcal`,  color: 'text-slate-200' },
-                { label: `TDEE ×${profile.activityMultiplier ?? '?'}`, val: `${profile.tdee} kcal`, color: 'text-slate-200' },
-                {
-                  label: 'Adjustment',
-                  val: `${(profile.goalAdj ?? 0) > 0 ? '+' : ''}${profile.goalAdj ?? 0} kcal`,
-                  color: (profile.goalAdj ?? 0) < 0 ? 'text-red-400' : (profile.goalAdj ?? 0) > 0 ? 'text-green-400' : 'text-slate-500',
-                },
-              ].map(row => (
-                <div key={row.label} className="flex justify-between">
-                  <span className="text-slate-500 text-xs">{row.label}</span>
-                  <span className={`text-xs font-semibold ${row.color}`}>{row.val}</span>
-                </div>
-              ))}
-            </>
-          )}
+          {[
+            { label: 'BMR', val: `${profile.bmr} kcal`, color: 'text-slate-200' },
+            {
+              label: `TDEE ×${profile.multiplier ?? ACTIVITY_LEVELS[profile.activityLevel]?.multiplier ?? profile.activityMultiplier ?? '?'}`,
+              val: `${profile.tdee} kcal`,
+              color: 'text-slate-200',
+            },
+            {
+              label: 'Goal adjustment',
+              val: `${(profile.goalAdj ?? 0) > 0 ? '+' : ''}${profile.goalAdj ?? 0} kcal`,
+              color: (profile.goalAdj ?? 0) < 0 ? 'text-red-400' : (profile.goalAdj ?? 0) > 0 ? 'text-green-400' : 'text-slate-500',
+            },
+          ].map(row => (
+            <div key={row.label} className="flex justify-between">
+              <span className="text-slate-500 text-xs">{row.label}</span>
+              <span className={`text-xs font-semibold ${row.color}`}>{row.val}</span>
+            </div>
+          ))}
           <div className="flex justify-between pt-2 border-t border-[#22223a]">
             <span className="text-slate-300 text-xs font-semibold">Target</span>
             <span className="text-violet-400 text-sm font-bold">{profile.calorieTarget} kcal</span>

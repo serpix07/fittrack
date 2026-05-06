@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
-  GOAL_LABELS, buildProfile, calcRecommendedBedtime,
-  BASE_ACTIVITY_LABELS, EXERCISE_BONUS_TABLE,
+  GOAL_LABELS, buildProfile, calcRecommendedBedtime, ACTIVITY_LEVELS,
 } from '../utils/calculations'
 
 const ALL_SPORTS = [
@@ -26,7 +25,7 @@ const TOTAL_STEPS = 7
 const EMPTY_DATA = {
   name: '', sex: 'male', age: '', height: '', weight: '', goalWeight: '',
   goal: '',
-  baseActivity: 'sedentary', exerciseDays: 0, sportsDays: 0,
+  activityLevel: 'sedentary',
   sports: [],
   wakeTime: '07:00', destination: 'work', travelTime: '30',
   photo: null,
@@ -163,107 +162,66 @@ function StepGoal({ data, update }) {
 
 // ─── Step 3: Activity ─────────────────────────────────────────────────────────
 
-function DayPicker({ label, icon, desc, value, onChange, max = 7 }) {
-  return (
-    <div className="bg-[#12121a] border border-[#1e1e30] rounded-2xl p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
-          <span className="text-2xl flex-shrink-0">{icon}</span>
-          <div className="min-w-0">
-            <p className="text-white font-semibold text-sm leading-tight">{label}</p>
-            <p className="text-slate-500 text-xs mt-0.5 truncate">{desc}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <button
-            onClick={() => onChange(Math.max(0, value - 1))}
-            className="w-11 h-11 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-xl leading-none"
-          >−</button>
-          <span className="text-white font-bold text-xl w-6 text-center">{value}</span>
-          <button
-            onClick={() => onChange(Math.min(max, value + 1))}
-            className="w-11 h-11 rounded-full bg-[#1a1a28] border border-[#22223a] text-white font-bold flex items-center justify-center hover:border-violet-500 active:scale-95 transition-all text-xl leading-none"
-          >+</button>
-        </div>
-      </div>
-      {value > 0 && (
-        <p className="text-slate-600 text-xs mt-2.5 ml-11">
-          {value} day{value > 1 ? 's' : ''}/week
-        </p>
-      )}
-    </div>
-  )
-}
-
-const BASE_ACTIVITY_OPTIONS = Object.entries(BASE_ACTIVITY_LABELS).map(([id, v]) => ({ id, ...v }))
+const ACTIVITY_OPTIONS = Object.entries(ACTIVITY_LEVELS).map(([id, v]) => ({ id, ...v }))
 
 function StepActivity({ data, update }) {
-  const exerciseDays  = Number(data.exerciseDays)
-  const exerciseBonus = EXERCISE_BONUS_TABLE[Math.min(7, exerciseDays)] ?? 0
-  const baseMult      = BASE_ACTIVITY_LABELS[data.baseActivity]?.multiplier ?? 1.2
-  const hasWorkouts   = exerciseDays > 0 || data.sports.length > 0
+  const current = ACTIVITY_LEVELS[data.activityLevel]
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-1">Daily Lifestyle</h2>
-      <p className="text-slate-400 text-sm mb-1">How active is your typical day?</p>
-      <p className="text-slate-500 text-xs mb-4 leading-relaxed">
-        Think about your <span className="text-slate-300 font-medium">total daily life</span> — work, study, and daily movement. <span className="text-slate-300 font-medium">Do NOT count your workouts</span> here. Those are added separately below.
+      <h2 className="text-2xl font-bold text-white mb-1">Activity Level</h2>
+      <p className="text-slate-400 text-sm mb-5">
+        How many days per week do you exercise?
       </p>
 
-      {hasWorkouts && (
-        <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-3 py-2.5 mb-4 flex items-start gap-2">
-          <span className="text-amber-400 text-base flex-shrink-0">💡</span>
-          <p className="text-amber-200/80 text-xs leading-relaxed">
-            Since you already told us about your workouts, choose the level that describes your day-to-day life <span className="font-medium">without</span> counting them.
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-2 mb-6">
-        {BASE_ACTIVITY_OPTIONS.map(opt => {
-          const sel = data.baseActivity === opt.id
+      <div className="space-y-2.5">
+        {ACTIVITY_OPTIONS.map(opt => {
+          const sel = data.activityLevel === opt.id
           return (
-            <button key={opt.id} onClick={() => update('baseActivity', opt.id)}
-              className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all ${
-                sel ? 'bg-violet-600/15 border-violet-500 ring-1 ring-violet-500/30'
-                    : 'bg-[#12121a] border-[#1e1e30] hover:border-[#2d2d4a]'
+            <button
+              key={opt.id}
+              onClick={() => update('activityLevel', opt.id)}
+              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border text-left transition-all ${
+                sel
+                  ? 'bg-violet-600/15 border-violet-500 ring-1 ring-violet-500/30'
+                  : 'bg-[#12121a] border-[#1e1e30] hover:border-[#2d2d4a]'
+              }`}
+            >
+              {/* Days chip — the visually prominent element */}
+              <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 transition-all ${
+                sel ? 'bg-violet-600 text-white' : 'bg-[#1a1a28] text-slate-400'
               }`}>
-              <span className="text-2xl w-8 text-center mt-0.5 flex-shrink-0">{opt.icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className={`font-semibold text-sm ${sel ? 'text-violet-300' : 'text-white'}`}>{opt.label}</p>
-                <p className="text-slate-500 text-xs mt-1 leading-relaxed">{opt.desc}</p>
+                <span className={`font-black leading-none ${opt.days.length > 3 ? 'text-sm' : 'text-lg'}`}>
+                  {opt.days}
+                </span>
+                <span className="text-[9px] font-medium uppercase tracking-wider mt-0.5 opacity-80">
+                  days
+                </span>
               </div>
-              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 transition-all ${
-                sel ? 'bg-violet-500 border-violet-500' : 'border-[#22223a]'
-              }`}>
-                {sel && <span className="text-white text-xs">✓</span>}
+
+              <div className="flex-1 min-w-0">
+                <p className={`font-semibold text-sm ${sel ? 'text-violet-300' : 'text-white'}`}>
+                  {opt.label}
+                </p>
+                <p className="text-slate-500 text-xs mt-0.5">{opt.desc}</p>
+              </div>
+
+              <div className="text-right flex-shrink-0">
+                <span className={`text-xs font-bold ${sel ? 'text-violet-400' : 'text-slate-600'}`}>
+                  ×{opt.multiplier}
+                </span>
               </div>
             </button>
           )
         })}
       </div>
 
-      <h3 className="text-white font-semibold text-base mb-1">Intentional Exercise</h3>
-      <p className="text-slate-400 text-sm mb-3">How many days/week do you work out? (gym, sports, cardio — everything counts)</p>
-
-      <DayPicker
-        label="Workout days per week"
-        icon="🏋️"
-        desc="All intentional exercise combined"
-        value={exerciseDays}
-        onChange={v => {
-          update('exerciseDays', v)
-          if (Number(data.sportsDays) > v) update('sportsDays', v)
-        }}
-      />
-
-      {exerciseDays > 0 && (
-        <div className="mt-3 bg-violet-900/20 border border-violet-700/30 rounded-2xl p-4">
-          <p className="text-violet-300 font-semibold text-sm mb-1">Your estimated TDEE components</p>
-          <p className="text-slate-400 text-xs">Lifestyle baseline: ×{baseMult}</p>
-          <p className="text-slate-400 text-xs">Exercise bonus: +{exerciseBonus} kcal/day</p>
-          <p className="text-slate-500 text-xs mt-1 italic">Sport bonus added in next step</p>
+      {current && (
+        <div className="mt-4 bg-violet-900/20 border border-violet-700/30 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-violet-400 text-lg">✓</span>
+          <p className="text-slate-400 text-xs">
+            <span className="text-violet-300 font-semibold">{current.label}</span> selected — TDEE multiplier ×{current.multiplier}
+          </p>
         </div>
       )}
     </div>
@@ -279,13 +237,12 @@ function StepSports({ data, update }) {
       : [...data.sports, id]
     update('sports', next)
   }
-  const maxSportsDays = Number(data.exerciseDays)
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-white mb-1">Your Sports</h2>
-      <p className="text-slate-400 text-sm mb-4">Select all activities you practise regularly</p>
-      <div className="grid grid-cols-2 gap-2.5 mb-5">
+      <p className="text-slate-400 text-sm mb-6">Select all activities you practise regularly</p>
+      <div className="grid grid-cols-2 gap-2.5">
         {ALL_SPORTS.map(s => {
           const sel = data.sports.includes(s.id)
           return (
@@ -301,17 +258,7 @@ function StepSports({ data, update }) {
         })}
       </div>
       {data.sports.length === 0 && (
-        <p className="text-amber-400/80 text-xs mb-4 text-center">Pick at least one activity to continue</p>
-      )}
-      {data.sports.length > 0 && (
-        <DayPicker
-          label="Sport/game sessions per week"
-          icon="⚽"
-          desc="How many of your exercise days involve these sports?"
-          value={Number(data.sportsDays)}
-          onChange={v => update('sportsDays', v)}
-          max={Math.max(maxSportsDays, 7)}
-        />
+        <p className="text-amber-400/80 text-xs mt-4 text-center">Pick at least one activity to continue</p>
       )}
     </div>
   )
@@ -389,10 +336,12 @@ function StepSchedule({ data, update }) {
 // ─── Step 6: Review ───────────────────────────────────────────────────────────
 
 function StepReview({ data, update }) {
-  const preview    = buildProfile(data)
-  const goalInfo   = GOAL_LABELS[data.goal]
-  const breakdown  = preview.tdeeBreakdown
-  const baseLabel  = BASE_ACTIVITY_LABELS[data.baseActivity]
+  const preview      = buildProfile(data)
+  const goalInfo     = GOAL_LABELS[data.goal]
+  const actLabel     = ACTIVITY_LEVELS[data.activityLevel]
+  const weeklyKg     = preview.goalAdj === 0
+    ? null
+    : (Math.abs(preview.goalAdj) * 7 / 7700).toFixed(1)
 
   const handlePhoto = e => {
     const file = e.target.files[0]
@@ -454,28 +403,16 @@ function StepReview({ data, update }) {
               valColor: 'text-slate-200',
             },
             {
-              label: `Base TDEE ×${baseLabel?.multiplier}`,
-              sub: `${baseLabel?.label} — lifestyle baseline`,
-              val: `${breakdown.baseTDEE} kcal`,
+              label: `TDEE ×${preview.multiplier}`,
+              sub: `${actLabel?.label} — ${actLabel?.desc}`,
+              val: `${preview.tdee} kcal`,
               valColor: 'text-slate-200',
             },
             {
-              label: 'Exercise bonus',
-              sub: `${data.exerciseDays} workout day${Number(data.exerciseDays) !== 1 ? 's' : ''}/week`,
-              val: breakdown.exerciseBonus > 0 ? `+${breakdown.exerciseBonus} kcal` : '0 kcal',
-              valColor: breakdown.exerciseBonus > 0 ? 'text-green-400' : 'text-slate-500',
-            },
-            {
-              label: 'Sport bonus',
-              sub: `${data.sportsDays} sport session${Number(data.sportsDays) !== 1 ? 's' : ''}/week · avg ${Math.round(breakdown.sportBonus * 7 / (Number(data.sportsDays) || 1))} kcal/session`,
-              val: breakdown.sportBonus > 0 ? `+${breakdown.sportBonus} kcal` : '0 kcal',
-              valColor: breakdown.sportBonus > 0 ? 'text-blue-400' : 'text-slate-500',
-            },
-            {
-              label: goalInfo?.label ?? data.goal,
-              sub: goalInfo?.weeklyChange
-                ? `≈ ${goalInfo.weeklyChange > 0 ? '+' : ''}${goalInfo.weeklyChange} kg/week`
-                : 'No adjustment',
+              label: `${goalInfo?.label ?? data.goal} (${goalInfo?.pct > 0 ? '+' : ''}${goalInfo?.pct ?? 0}%)`,
+              sub: weeklyKg
+                ? `≈ ${preview.goalAdj > 0 ? '+' : '−'}${weeklyKg} kg/week`
+                : 'No change',
               val: `${preview.goalAdj > 0 ? '+' : ''}${preview.goalAdj} kcal`,
               valColor: preview.goalAdj < 0 ? 'text-red-400' : preview.goalAdj > 0 ? 'text-green-400' : 'text-slate-500',
             },
@@ -494,9 +431,9 @@ function StepReview({ data, update }) {
           </div>
         </div>
         <div className="mt-3 bg-blue-900/20 border border-blue-700/30 rounded-xl p-3">
-          <p className="text-blue-300 text-xs font-semibold mb-1">💡 Net calories tip</p>
+          <p className="text-blue-300 text-xs font-semibold mb-1">💡 Net calories</p>
           <p className="text-slate-400 text-xs leading-relaxed">
-            Your target already accounts for your regular training. On days you do an extra or longer session, you can eat back some of those calories to stay on track — this is called <span className="text-blue-300 font-medium">net calories</span>. Log your workouts and add them to today's goal if you want day-by-day precision.
+            Your target already accounts for your regular training. On days you do an extra session, you can eat back those calories — this is called <span className="text-blue-300 font-medium">net calories</span>. Log workouts to get day-by-day precision.
           </p>
         </div>
       </div>
@@ -510,7 +447,7 @@ function StepReview({ data, update }) {
             <p className="text-slate-500 text-xs">Bedtime</p>
           </div>
           <div className="text-center">
-            <p className="text-green-400 font-bold text-base">{baseLabel?.icon} {baseLabel?.label}</p>
+            <p className="text-green-400 font-bold text-base">{actLabel?.label}</p>
             <p className="text-slate-500 text-xs">Activity</p>
           </div>
           <div className="text-center">
