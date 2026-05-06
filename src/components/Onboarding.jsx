@@ -15,9 +15,10 @@ const ALL_SPORTS = [
 ]
 
 const GOAL_GROUPS = [
-  { title: 'Fat Loss',    keys: ['fat_loss_slow', 'fat_loss_moderate', 'fat_loss_aggressive'] },
-  { title: 'Muscle Gain', keys: ['muscle_gain_lean', 'muscle_gain_standard'] },
-  { title: 'Other',       keys: ['recomposition', 'maintenance'] },
+  { title: 'Fat Loss',           keys: ['fat_loss_slow', 'fat_loss_moderate', 'fat_loss_aggressive'] },
+  { title: 'Muscle Gain',        keys: ['muscle_gain_lean', 'muscle_gain_standard'] },
+  { title: 'Body Recomposition', keys: ['recomp_slow', 'recomp_standard', 'recomp_aggressive'] },
+  { title: 'Other',              keys: ['maintenance'] },
 ]
 
 const TOTAL_STEPS = 7

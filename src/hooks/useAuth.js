@@ -11,8 +11,14 @@ export function useAuth() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, setUser)
-    return unsub
+    const unsub = onAuthStateChanged(
+      auth,
+      (u) => setUser(u),
+      (err) => { console.error('Firebase auth error:', err); setUser(null) }
+    )
+    // If Firebase doesn't respond within 6s, assume not authenticated
+    const timeout = setTimeout(() => setUser(prev => prev === undefined ? null : prev), 6000)
+    return () => { unsub(); clearTimeout(timeout) }
   }, [])
 
   const signIn = async () => {
@@ -20,10 +26,15 @@ export function useAuth() {
     try {
       await signInWithPopup(auth, googleProvider)
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-        setError(err.code === 'auth/unauthorized-domain'
-          ? 'This domain is not authorised in Firebase. Add it in Firebase Console → Auth → Settings → Authorized domains.'
-          : err.message)
+      const ignored = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request']
+      if (!ignored.includes(err.code)) {
+        setError(
+          err.code === 'auth/unauthorized-domain'
+            ? 'This domain is not authorised in Firebase. Add it in Firebase Console → Auth → Settings → Authorized domains.'
+            : err.code === 'auth/popup-blocked'
+            ? 'Popup was blocked by the browser. Please allow popups for this site and try again.'
+            : err.message
+        )
       }
     }
   }

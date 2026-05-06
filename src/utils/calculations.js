@@ -4,8 +4,8 @@ export function getActivityMultiplier(totalDays) {
   if (totalDays === 0) return 1.2
   if (totalDays <= 2)  return 1.375
   if (totalDays <= 4)  return 1.55
-  if (totalDays <= 6)  return 1.725
-  return 1.9
+  if (totalDays <= 6)  return 1.65
+  return 1.725
 }
 
 export function getActivityLabel(totalDays) {
@@ -21,8 +21,8 @@ export const ACTIVITY_LABELS = {
   sedentary: { label: 'Sedentary', icon: '🪑', desc: 'Desk job, little to no exercise', multiplier: 1.2   },
   light:     { label: 'Light',     icon: '🚶', desc: '1–3 workouts per week',           multiplier: 1.375 },
   moderate:  { label: 'Moderate',  icon: '🏃', desc: '3–5 workouts per week',           multiplier: 1.55  },
-  high:      { label: 'High',      icon: '💪', desc: '6–7 workouts per week',           multiplier: 1.725 },
-  very_high: { label: 'Very High', icon: '🏆', desc: 'Athlete / twice-a-day training',  multiplier: 1.9   },
+  high:      { label: 'High',      icon: '💪', desc: '6–7 workouts per week',           multiplier: 1.65  },
+  very_high: { label: 'Very High', icon: '🏆', desc: 'Athlete / twice-a-day training',  multiplier: 1.725 },
 }
 
 // ─── Goal labels ──────────────────────────────────────────────────────────────
@@ -55,11 +55,30 @@ export const GOAL_LABELS = {
     desc: '+350 kcal/day · ~0.5 kg/week gain',
     adj: 350, weeklyChange: 0.5, category: 'muscle_gain',
   },
+  recomp_slow: {
+    label: 'Recomp — Slow', icon: '⚡',
+    desc: '−100 kcal/day · Minimal deficit',
+    adj: -100, weeklyChange: 0, category: 'recomp',
+    note: 'Minimal deficit. Maximum muscle preservation. Best for advanced lifters.',
+  },
+  recomp_standard: {
+    label: 'Recomp — Standard', icon: '⚡',
+    desc: '−250 kcal/day · Balanced approach',
+    adj: -250, weeklyChange: 0, category: 'recomp',
+    note: 'Balanced approach. Lose fat and gain muscle simultaneously.',
+  },
+  recomp_aggressive: {
+    label: 'Recomp — Aggressive', icon: '⚡',
+    desc: '−400 kcal/day · Faster fat loss',
+    adj: -400, weeklyChange: 0, category: 'recomp',
+    note: 'Faster fat loss. Harder to maintain muscle. Best for beginners with higher body fat.',
+  },
+  // Legacy key — old saved profiles
   recomposition: {
     label: 'Body Recomp', icon: '⚡',
     desc: 'Lose fat & gain muscle simultaneously',
     adj: -250, weeklyChange: 0, category: 'recomp',
-    note: 'Recomposition = small deficit + high protein. You will lose fat and gain muscle simultaneously, but slower than dedicated fat loss or bulk. Best for beginners or people returning after a break.',
+    note: 'Recomposition = small deficit + high protein.',
   },
   maintenance: {
     label: 'Maintenance', icon: '⚖️',
@@ -77,13 +96,16 @@ const GOAL_PROTEIN_MULTIPLIER = {
   fat_loss_slow:        2.0,
   fat_loss_moderate:    2.0,
   fat_loss_aggressive:  2.2,
-  recomposition:        2.2,
+  recomp_slow:          2.0,
+  recomp_standard:      2.2,
+  recomp_aggressive:    2.4,
   muscle_gain_lean:     2.0,
   muscle_gain_standard: 1.8,
   maintenance:          1.6,
   // legacy
-  fat_loss:    2.0,
-  muscle_gain: 2.0,
+  recomposition: 2.2,
+  fat_loss:      2.0,
+  muscle_gain:   2.0,
 }
 
 // ─── Sport bonus (kcal per session) ──────────────────────────────────────────
@@ -127,14 +149,7 @@ export function calcBMR({ sex, age, height, weight }) {
 
 export function calcTDEE(bmr, { trainingDays = 0, cardioDays = 0, sportsDays = 0, sports = [] } = {}) {
   const totalDays = trainingDays + cardioDays + sportsDays
-  const base = Math.round(bmr * getActivityMultiplier(totalDays))
-
-  const sportList = Array.isArray(sports) ? sports : []
-  const bonuses   = sportList.filter(s => (SPORT_BONUS[s] ?? 0) > 0).map(s => SPORT_BONUS[s])
-  const avgBonus  = bonuses.length > 0 ? bonuses.reduce((a, b) => a + b, 0) / bonuses.length : 0
-  const dailyBonus = Math.round((sportsDays * avgBonus) / 7)
-
-  return base + dailyBonus
+  return Math.round(bmr * getActivityMultiplier(totalDays))
 }
 
 export function calcCalorieTarget(tdee, goal) {
