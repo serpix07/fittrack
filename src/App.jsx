@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense, Component } from 'react'
 import { useLocalStorage }   from './hooks/useLocalStorage'
 import { useInstallPrompt }  from './hooks/useInstallPrompt'
 import { useAuth }           from './hooks/useAuth'
@@ -45,6 +45,60 @@ const TABS = [
     </svg>
   )},
 ]
+
+// ─── Error boundary ───────────────────────────────────────────────────────────
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { crashed: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { crashed: true }
+  }
+
+  componentDidCatch(err, info) {
+    console.error('FitTrack crash:', err, info)
+  }
+
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-6 text-center gap-5">
+          <div className="w-16 h-16 rounded-2xl bg-red-900/30 border border-red-700/40 flex items-center justify-center text-3xl">
+            ⚠️
+          </div>
+          <div>
+            <h2 className="text-white font-bold text-xl mb-2">Something went wrong</h2>
+            <p className="text-slate-400 text-sm max-w-xs leading-relaxed">
+              The app crashed unexpectedly. Your data is safe — it's stored locally on your device.
+            </p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-violet-600 hover:bg-violet-500 active:scale-95 text-white font-semibold px-6 py-3 rounded-xl transition-all"
+          >
+            Reload app
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+// ─── Dismiss the HTML loader once React has painted ──────────────────────────
+
+function useDismissHtmlLoader() {
+  useEffect(() => {
+    const el = document.getElementById('app-loader')
+    if (!el) return
+    el.classList.add('ft-fade-out')
+    const t = setTimeout(() => el.remove(), 280)
+    return () => clearTimeout(t)
+  }, [])
+}
 
 // ─── Splash / loading screen ─────────────────────────────────────────────────
 
@@ -169,9 +223,12 @@ function MainApp({ user, logOut, canInstall, onInstall }) {
 
 // ─── Root ────────────────────────────────────────────────────────────────────
 
-export default function App() {
+function AppInner() {
   const { user, loading, signIn, logOut, error } = useAuth()
   const { canInstall, install } = useInstallPrompt()
+
+  // Fade out the HTML loader as soon as React paints for the first time
+  useDismissHtmlLoader()
 
   if (loading)   return <Splash />
   if (!user)     return <LoginScreen onSignIn={signIn} error={error} />
@@ -186,5 +243,13 @@ export default function App() {
       canInstall={canInstall}
       onInstall={install}
     />
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   )
 }

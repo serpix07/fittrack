@@ -16,8 +16,74 @@
     <!-- Open Graph -->
     <meta property="og:title" content="FitTrack" />
     <meta property="og:description" content="Your personalized health & fitness companion" />
+
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      /* Dark base — prevents any white flash */
+      html, body, #root {
+        background: #0a0a0f;
+        min-height: 100%;
+      }
+
+      /* ── HTML loading screen (shown before React mounts) ── */
+      #app-loader {
+        position: fixed;
+        inset: 0;
+        background: #0a0a0f;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        z-index: 9999;
+        transition: opacity 0.25s ease;
+      }
+      #app-loader.ft-fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .ft-logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: ft-pulse 2s ease-in-out infinite;
+      }
+      .ft-spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid rgba(124, 58, 237, 0.25);
+        border-top-color: #7c3aed;
+        border-radius: 50%;
+        animation: ft-spin 0.75s linear infinite;
+      }
+
+      @keyframes ft-spin {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes ft-pulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.25); }
+        50%       { box-shadow: 0 0 48px rgba(124, 58, 237, 0.55); }
+      }
+    </style>
   </head>
   <body>
+    <!-- Shown immediately; React removes it once mounted -->
+    <div id="app-loader" aria-hidden="true">
+      <div class="ft-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" width="32" height="32">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div class="ft-spinner"></div>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
