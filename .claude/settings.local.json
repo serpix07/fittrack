@@ -21,7 +21,9 @@
       "PowerShell(head *)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\" -Recurse | Where-Object {$_.PSIsContainer} | Select-Object -ExpandProperty FullName)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\\\\src\" -Recurse -Filter \"*.jsx\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }
