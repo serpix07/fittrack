@@ -19,7 +19,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "PowerShell(head *)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\" -Recurse | Where-Object {$_.PSIsContainer} | Select-Object -ExpandProperty FullName)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\" -Recurse | Where-Object {$_.PSIsContainer} | Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\adm.julen\\\\mi-salud-app\\\\src\" -Recurse -Filter \"*.jsx\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

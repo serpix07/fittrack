@@ -4,39 +4,6 @@ import BarcodeScanner from './BarcodeScanner'
 
 const today = () => new Date().toISOString().split('T')[0]
 
-// ─── Open Food Facts ──────────────────────────────────────────────────────────
-
-async function lookupBarcode(barcode) {
-  const res = await fetch(
-    `https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`,
-    { signal: AbortSignal.timeout(10_000) }
-  )
-  if (!res.ok) throw new Error('Network error — check your connection')
-  const data = await res.json()
-  if (data.status !== 1) throw new Error('Product not found in Open Food Facts database')
-
-  const p = data.product || {}
-  const n = p.nutriments || {}
-  const kcal100 =
-    n['energy-kcal_100g'] != null ? n['energy-kcal_100g']
-    : n['energy-kcal']    != null ? n['energy-kcal']
-    : n['energy_100g']    != null ? n['energy_100g'] / 4.184
-    : 0
-
-  return {
-    type: 'barcode',
-    name:   p.product_name || p.product_name_en || p.abbreviated_product_name || 'Unknown product',
-    brand:  p.brands || '',
-    image:  p.image_thumb_url || p.image_small_url || null,
-    per100: {
-      kcal:    Math.round(kcal100),
-      protein: Math.round((n.proteins_100g      ?? 0) * 10) / 10,
-      carbs:   Math.round((n.carbohydrates_100g ?? 0) * 10) / 10,
-      fat:     Math.round((n.fat_100g           ?? 0) * 10) / 10,
-    },
-  }
-}
-
 // ─── Claude photo analysis (via Netlify serverless proxy) ────────────────────
 
 async function resizeImage(dataUrl, maxDim = 1024) {
@@ -147,6 +114,12 @@ export default function NutritionTracker({ profile, userId }) {
   const [product, setProduct]         = useState(null)
   const [grams, setGrams]             = useState('100')
 
+  // ── Barcode food added (scanner handles lookup internally now) ─────────────
+  const handleFoodAdded = (meal) => {
+    pushMeal(meal)
+    setScanning(false)
+  }
+
   const photoInputRef = useRef(null)
 
   // ── Totals ─────────────────────────────────────────────────────────────────
@@ -156,24 +129,6 @@ export default function NutritionTracker({ profile, userId }) {
     { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   )
   const remaining = { kcal: goals.kcal - totals.kcal, protein: goals.protein - totals.protein }
-
-  // ── Barcode ────────────────────────────────────────────────────────────────
-  const handleBarcodeScan = async (code) => {
-    setScanning(false)
-    setLookupState('loading')
-    setLookupError('')
-    setProduct(null)
-    try {
-      const p = await lookupBarcode(code)
-      setProduct(p)
-      setGrams('100')
-      setShowForm(true)
-    } catch (err) {
-      setLookupError(err.message)
-    } finally {
-      setLookupState(null)
-    }
-  }
 
   // ── Photo ──────────────────────────────────────────────────────────────────
   const handlePhotoChange = async (e) => {
@@ -244,7 +199,7 @@ export default function NutritionTracker({ profile, userId }) {
   return (
     <div className="space-y-4">
       {scanning && (
-        <BarcodeScanner onResult={handleBarcodeScan} onClose={() => setScanning(false)} />
+        <BarcodeScanner onFoodAdded={handleFoodAdded} onClose={() => setScanning(false)} />
       )}
 
       {/* Hidden photo input */}
